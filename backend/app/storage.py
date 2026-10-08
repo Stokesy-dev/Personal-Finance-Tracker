@@ -77,3 +77,13 @@ def summary(user_id: int) -> dict[str, object]:
     expenses = next((-(row["total"] or 0) for row in rows if row["transaction_type"] == "expense"), 0)
     savings = income - expenses
     return {"income": income / 100, "expenses": expenses / 100, "savings": savings / 100, "savings_rate": round(savings / income * 100, 2) if income else 0, "categories": [], "recent_transactions": []}
+
+
+def unusual_expenses(user_id: int) -> list[dict[str, object]]:
+    connection = _connect(); _init_transactions(connection)
+    rows = connection.execute("SELECT id, transaction_date, description, amount_cents FROM transactions WHERE user_id = ? AND transaction_type = 'expense' ORDER BY transaction_date DESC", (user_id,)).fetchall(); connection.close()
+    amounts = sorted(abs(row["amount_cents"]) for row in rows)
+    if len(amounts) < 3: return []
+    median = amounts[len(amounts) // 2]
+    threshold = max(5000, median * 3)
+    return [{"id": row["id"], "date": row["transaction_date"], "description": row["description"], "amount": abs(row["amount_cents"]) / 100, "threshold": threshold / 100, "reason": "More than three times your typical expense"} for row in rows if abs(row["amount_cents"]) >= threshold]

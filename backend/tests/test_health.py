@@ -116,3 +116,14 @@ def test_categorization_prefers_rules_then_fallback() -> None:
         assert ruled["source"] == "merchant_rule" and ruled["confidence"] == 1.0
         fallback = client.post("/api/v1/categorize?description=Morning%20coffee", headers=headers).json()
         assert fallback["category"] == "Coffee" and fallback["source"] == "keyword_fallback"
+
+
+def test_unusual_spending_alerts_are_user_scoped() -> None:
+    with tempfile.NamedTemporaryFile() as database:
+        auth.DATABASE_PATH = database.name
+        token = client.post("/api/v1/auth/register", json={"email": "alerts@example.com", "password": "secure-pass-123"}).json()["access_token"]
+        headers = {"Authorization": f"Bearer {token}"}
+        rows = [{"date": "2026-01-01", "description": "Coffee", "amount": "-4.00", "type": "expense"}, {"date": "2026-01-02", "description": "Lunch", "amount": "-5.00", "type": "expense"}, {"date": "2026-01-03", "description": "Laptop", "amount": "-500.00", "type": "expense"}]
+        client.post("/api/v1/imports/commit?import_id=jan", headers=headers, json=rows)
+        alerts = client.get("/api/v1/alerts/unusual-spending", headers=headers)
+        assert alerts.status_code == 200 and alerts.json()["alerts"][0]["description"] == "Laptop"
