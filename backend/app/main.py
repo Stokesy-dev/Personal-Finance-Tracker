@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field
 from fastapi.middleware.cors import CORSMiddleware
 from .auth import Credentials, current_user, login, register
 from .imports import normalize_rows, preview_csv, validate_mapping
+from .categorization import categorize
 from .storage import create_category, create_rule, list_categories, list_imports, list_rules, save_transactions, summary as user_summary
 
 class CategoryInput(BaseModel):
@@ -102,3 +103,8 @@ def add_merchant_rule(rule: RuleInput, user=Depends(current_user)):
     from fastapi import HTTPException
     try: return create_rule(user["id"], rule.keyword, rule.category_id)
     except ValueError as exc: raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/v1/categorize")
+def categorize_transaction(description: str, user=Depends(current_user)):
+    return categorize(description, list_categories(user["id"]), list_rules(user["id"]))
