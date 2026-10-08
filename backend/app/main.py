@@ -1,8 +1,17 @@
 from fastapi import Depends, FastAPI, File, UploadFile
+from pydantic import BaseModel, Field
 from fastapi.middleware.cors import CORSMiddleware
 from .auth import Credentials, current_user, login, register
 from .imports import normalize_rows, preview_csv, validate_mapping
-from .storage import list_imports, save_transactions, summary as user_summary
+from .storage import create_category, create_rule, list_categories, list_imports, list_rules, save_transactions, summary as user_summary
+
+class CategoryInput(BaseModel):
+    name: str = Field(min_length=1, max_length=40)
+    color: str = Field(default="#7a9186", pattern=r"^#[0-9a-fA-F]{6}$")
+
+class RuleInput(BaseModel):
+    keyword: str = Field(min_length=2, max_length=80)
+    category_id: int
 
 app = FastAPI(title="Personal Finance Tracker API", version="0.1.0")
 
@@ -69,3 +78,27 @@ def commit_import(import_id: str, transactions: list[dict[str, str]], user=Depen
 @app.get("/api/v1/imports")
 def imports(user=Depends(current_user)):
     return {"imports": list_imports(user["id"])}
+
+
+@app.get("/api/v1/categories")
+def categories(user=Depends(current_user)):
+    return {"categories": list_categories(user["id"])}
+
+
+@app.post("/api/v1/categories", status_code=201)
+def add_category(category: CategoryInput, user=Depends(current_user)):
+    from fastapi import HTTPException
+    try: return create_category(user["id"], category.name, category.color)
+    except ValueError as exc: raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.get("/api/v1/merchant-rules")
+def merchant_rules(user=Depends(current_user)):
+    return {"rules": list_rules(user["id"])}
+
+
+@app.post("/api/v1/merchant-rules", status_code=201)
+def add_merchant_rule(rule: RuleInput, user=Depends(current_user)):
+    from fastapi import HTTPException
+    try: return create_rule(user["id"], rule.keyword, rule.category_id)
+    except ValueError as exc: raise HTTPException(status_code=400, detail=str(exc)) from exc

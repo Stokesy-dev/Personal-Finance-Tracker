@@ -90,3 +90,16 @@ def test_commit_and_summary() -> None:
         assert client.get("/api/v1/summary", headers=headers).json()["income"] == 2000
         assert client.get("/api/v1/summary", headers=headers).json()["expenses"] == 4.5
         assert client.get("/api/v1/imports", headers=headers).json()["imports"][0]["transaction_count"] == 2
+
+
+def test_categories_and_merchant_rules_are_user_scoped() -> None:
+    with tempfile.NamedTemporaryFile() as database:
+        auth.DATABASE_PATH = database.name
+        token = client.post("/api/v1/auth/register", json={"email": "rules@example.com", "password": "secure-pass-123"}).json()["access_token"]
+        headers = {"Authorization": f"Bearer {token}"}
+        category = client.post("/api/v1/categories", headers=headers, json={"name": "Coffee", "color": "#aabbcc"})
+        assert category.status_code == 201
+        rule = client.post("/api/v1/merchant-rules", headers=headers, json={"keyword": "Starbucks", "category_id": category.json()["id"]})
+        assert rule.status_code == 201
+        assert rule.json()["keyword"] == "starbucks"
+        assert client.get("/api/v1/merchant-rules", headers=headers).json()["rules"][0]["category_name"] == "Coffee"
