@@ -38,3 +38,31 @@ def test_register_login_and_current_user() -> None:
         assert client.post("/api/v1/auth/login", json=credentials).status_code == 200
         assert client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"}).json()["email"] == credentials["email"]
         assert client.post("/api/v1/auth/register", json=credentials).status_code == 409
+
+
+def test_csv_preview_requires_auth_and_returns_columns() -> None:
+    with tempfile.NamedTemporaryFile() as database:
+        auth.DATABASE_PATH = database.name
+        credentials = {"email": "csv@example.com", "password": "secure-pass-123"}
+        token = client.post("/api/v1/auth/register", json=credentials).json()["access_token"]
+        response = client.post(
+            "/api/v1/imports/preview",
+            headers={"Authorization": f"Bearer {token}"},
+            files={"file": ("statement.csv", "Date,Description,Amount\n2026-01-01,Coffee,-4.50\n", "text/csv")},
+        )
+        assert response.status_code == 200
+        assert response.json()["columns"] == ["Date", "Description", "Amount"]
+        assert response.json()["rows"][0]["Description"] == "Coffee"
+
+
+def test_mapping_rejects_missing_amount() -> None:
+    with tempfile.NamedTemporaryFile() as database:
+        auth.DATABASE_PATH = database.name
+        token = client.post("/api/v1/auth/register", json={"email": "mapping@example.com", "password": "secure-pass-123"}).json()["access_token"]
+        response = client.post(
+            "/api/v1/imports/validate-mapping",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"columns": ["Date", "Description"], "mapping": {"Date": "date", "Description": "description"}},
+        )
+        assert response.status_code == 400
+        return
