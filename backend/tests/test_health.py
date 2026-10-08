@@ -17,15 +17,7 @@ def test_health_endpoint() -> None:
 
 def test_summary_shape() -> None:
     response = client.get("/api/v1/summary")
-    assert response.status_code == 200
-    assert set(response.json()) == {
-        "income",
-        "expenses",
-        "savings",
-        "savings_rate",
-        "categories",
-        "recent_transactions",
-    }
+    assert response.status_code == 403
 
 
 def test_register_login_and_current_user() -> None:
@@ -85,3 +77,16 @@ def test_normalize_debit_credit_rows() -> None:
             {"date": "2026-01-01", "description": "Salary", "amount": "2000.00", "type": "income"},
             {"date": "2026-01-02", "description": "Coffee", "amount": "-4.50", "type": "expense"},
         ]
+
+
+def test_commit_and_summary() -> None:
+    with tempfile.NamedTemporaryFile() as database:
+        auth.DATABASE_PATH = database.name
+        token = client.post("/api/v1/auth/register", json={"email": "storage@example.com", "password": "secure-pass-123"}).json()["access_token"]
+        headers = {"Authorization": f"Bearer {token}"}
+        rows = [{"date": "2026-01-01", "description": "Salary", "amount": "2000.00", "type": "income"}, {"date": "2026-01-02", "description": "Coffee", "amount": "-4.50", "type": "expense"}]
+        committed = client.post("/api/v1/imports/commit?import_id=january", headers=headers, json=rows)
+        assert committed.status_code == 201
+        assert client.get("/api/v1/summary", headers=headers).json()["income"] == 2000
+        assert client.get("/api/v1/summary", headers=headers).json()["expenses"] == 4.5
+        assert client.get("/api/v1/imports", headers=headers).json()["imports"][0]["transaction_count"] == 2
