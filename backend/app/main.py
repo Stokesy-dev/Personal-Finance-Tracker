@@ -1,7 +1,7 @@
 from fastapi import Depends, FastAPI, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from .auth import Credentials, current_user, login, register
-from .imports import preview_csv, validate_mapping
+from .imports import normalize_rows, preview_csv, validate_mapping
 
 app = FastAPI(title="Personal Finance Tracker API", version="0.1.0")
 
@@ -43,6 +43,13 @@ async def csv_preview(file: UploadFile = File(...), user=Depends(current_user)):
 @app.post("/api/v1/imports/validate-mapping")
 def mapping_preview(columns: list[str], mapping: dict[str, str], user=Depends(current_user)):
     return {"mapping": validate_mapping(columns, mapping), "user_id": user["id"]}
+
+
+@app.post("/api/v1/imports/normalize")
+def normalize_import(rows: list[dict[str, str]], mapping: dict[str, str], user=Depends(current_user)):
+    validated_mapping = validate_mapping(list(rows[0].keys()) if rows else [], mapping)
+    normalized = normalize_rows(rows, validated_mapping)
+    return {"transactions": [transaction.__dict__ for transaction in normalized], "user_id": user["id"]}
 
 
 @app.get("/api/v1/summary")

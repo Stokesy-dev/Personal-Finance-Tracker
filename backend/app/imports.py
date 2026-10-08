@@ -1,5 +1,6 @@
 import csv
 import io
+from datetime import date
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 
@@ -10,6 +11,14 @@ from fastapi import HTTPException, UploadFile
 class CsvPreview:
     columns: list[str]
     rows: list[dict[str, str]]
+
+
+@dataclass
+class NormalizedTransaction:
+    date: str
+    description: str
+    amount: str
+    type: str
 
 
 async def preview_csv(upload: UploadFile) -> CsvPreview:
@@ -53,3 +62,23 @@ def parse_amount(value: str) -> Decimal:
         return Decimal(cleaned)
     except InvalidOperation as exc:
         raise HTTPException(status_code=400, detail=f"Invalid transaction amount: {value}") from exc
+
+
+def normalize_rows(rows: list[dict[str, str]], mapping: dict[str, str]) -> list[NormalizedTransaction]:
+    """Convert mapped bank rows into a consistent signed-amount representation."""
+    normalized: list[NormalizedTransaction] = []
+    source_for = {target: source for source, target in mapping.items()}
+    for row_number, row in enumerate(rows, start=2):
+        try:
+            transaction_date = date.fromisoformat(row[source_for["date"]]).isoformat()
+        except (KeyError, ValueError) as exc:
+            raise HTTPException(status_code=400, detail=f"Invalid date on row {row_number}; use YYYY-MM-DD") from exc
+        description = row.get(source_for["description"], "").strip()
+        if not description:
+            raise HTTPException(status_code=400, detail=f"Missing description on row {row_number}")
+        if "amount" in mapping.values():
+            amount = parse_amount(row.get(source_for["amount"], ""))
+        else:
+            amount = parse_amount(row.get(source_for["credit"], "")) - parse_amount(row.get(source_for["debit"], ""))
+        normalized.append(NormalizedTransaction(date=transaction_date, description=description, amount=f"{amount:.2f}", type="income" if amount >= 0 else "expense"))
+    return normalized
