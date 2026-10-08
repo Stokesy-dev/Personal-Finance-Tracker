@@ -38,7 +38,7 @@ async def preview_csv(upload: UploadFile) -> CsvPreview:
         raise HTTPException(status_code=400, detail="Could not parse this CSV file") from exc
     if not rows:
         raise HTTPException(status_code=400, detail="CSV file contains no transactions")
-    return CsvPreview(columns=columns, rows=rows[:10])
+    return CsvPreview(columns=columns, rows=rows)
 
 
 def validate_mapping(columns: list[str], mapping: dict[str, str]) -> dict[str, str]:

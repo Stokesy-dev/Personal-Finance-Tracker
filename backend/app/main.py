@@ -48,7 +48,7 @@ def me(user=Depends(current_user)):
 @app.post("/api/v1/imports/preview")
 async def csv_preview(file: UploadFile = File(...), user=Depends(current_user)):
     preview = await preview_csv(file)
-    return {"columns": preview.columns, "rows": preview.rows, "user_id": user["id"]}
+    return {"columns": preview.columns, "rows": preview.rows, "preview_rows": preview.rows[:10], "user_id": user["id"]}
 
 
 @app.post("/api/v1/imports/validate-mapping")
