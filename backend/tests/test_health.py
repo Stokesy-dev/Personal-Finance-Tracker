@@ -1,6 +1,9 @@
 from fastapi.testclient import TestClient
+import os
+import tempfile
 
 from app.main import app
+from app import auth
 
 
 client = TestClient(app)
@@ -23,3 +26,15 @@ def test_summary_shape() -> None:
         "categories",
         "recent_transactions",
     }
+
+
+def test_register_login_and_current_user() -> None:
+    with tempfile.NamedTemporaryFile() as database:
+        auth.DATABASE_PATH = database.name
+        credentials = {"email": "person@example.com", "password": "secure-pass-123"}
+        registered = client.post("/api/v1/auth/register", json=credentials)
+        assert registered.status_code == 201
+        token = registered.json()["access_token"]
+        assert client.post("/api/v1/auth/login", json=credentials).status_code == 200
+        assert client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"}).json()["email"] == credentials["email"]
+        assert client.post("/api/v1/auth/register", json=credentials).status_code == 409
