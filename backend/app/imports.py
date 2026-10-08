@@ -44,6 +44,10 @@ async def preview_csv(upload: UploadFile) -> CsvPreview:
 def validate_mapping(columns: list[str], mapping: dict[str, str]) -> dict[str, str]:
     required = {"date", "description"}
     amount_modes = [{"amount"}, {"debit", "credit"}]
+    # Accept both CSV-column -> app-field and app-field -> CSV-column.
+    # The latter keeps requests from already-open older frontend bundles working.
+    if not required.issubset(mapping.values()) and required.issubset(mapping.keys()):
+        mapping = {source: field for field, source in mapping.items() if source}
     mapped = set(mapping.values())
     if not required.issubset(mapped):
         raise HTTPException(status_code=400, detail="Mapping must include date and description")
