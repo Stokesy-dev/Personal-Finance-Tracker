@@ -9,3 +9,4 @@ frontend/.next/
 bankstatement.pdf
 bankstatement.csv
 .DS_Store
+backend/finance.db
