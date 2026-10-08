@@ -1,19 +1,17 @@
-const cards = [
-  ["Income", "$0.00", "This month"],
-  ["Expenses", "$0.00", "This month"],
-  ["Savings", "$0.00", "This month"],
-];
+"use client";
+
+import { FormEvent, useEffect, useState } from "react";
+
+type Summary = { income: number; expenses: number; savings: number; savings_rate: number };
+const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+function money(value: number) { return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value); }
 
 export default function Home() {
-  return (
-    <main className="shell">
-      <header className="header">
-        <div><p className="eyebrow">PERSONAL FINANCE</p><h1>Your money, clearly.</h1></div>
-        <button className="button">Import CSV</button>
-      </header>
-      <section className="welcome"><p className="eyebrow">MONTHLY OVERVIEW</p><h2>Good morning.</h2><p>Import a bank statement to start understanding your spending.</p></section>
-      <section className="cards">{cards.map(([label, value, note]) => <article className="card" key={label}><p>{label}</p><strong>{value}</strong><small>{note}</small></article>)}</section>
-      <section className="empty"><div className="icon">＋</div><h2>No transactions yet</h2><p>Upload a CSV statement and we’ll organize your income and expenses into a simple monthly view.</p><button className="button">Upload your first statement</button></section>
-    </main>
-  );
+  const [email, setEmail] = useState(""); const [password, setPassword] = useState(""); const [token, setToken] = useState<string | null>(null); const [summary, setSummary] = useState<Summary | null>(null); const [error, setError] = useState("");
+  useEffect(() => { const saved = window.localStorage.getItem("finance_token"); if (saved) { setToken(saved); loadSummary(saved); } }, []);
+  async function loadSummary(accessToken: string) { const response = await fetch(`${API}/api/v1/summary`, { headers: { Authorization: `Bearer ${accessToken}` } }); if (response.ok) setSummary(await response.json()); else { window.localStorage.removeItem("finance_token"); setToken(null); } }
+  async function submit(event: FormEvent) { event.preventDefault(); setError(""); const response = await fetch(`${API}/api/v1/auth/login`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password }) }); const body = await response.json(); if (!response.ok) { setError(body.detail ?? "Could not sign in"); return; } window.localStorage.setItem("finance_token", body.access_token); setToken(body.access_token); loadSummary(body.access_token); }
+  if (!token) return <main className="auth-shell"><div className="auth-card"><p className="eyebrow">PERSONAL FINANCE</p><h1>Your money, clearly.</h1><p className="muted">Sign in to see your monthly spending overview.</p><form onSubmit={submit}><label>Email<input type="email" required value={email} onChange={event => setEmail(event.target.value)} /></label><label>Password<input type="password" required minLength={8} value={password} onChange={event => setPassword(event.target.value)} /></label>{error && <p className="error">{error}</p>}<button className="button">Sign in</button></form></div></main>;
+  const cards = [["Income", money(summary?.income ?? 0), "This month"], ["Expenses", money(summary?.expenses ?? 0), "This month"], ["Savings", money(summary?.savings ?? 0), `${summary?.savings_rate ?? 0}% savings rate`]];
+  return <main className="shell"><header className="header"><div><p className="eyebrow">PERSONAL FINANCE</p><h1>Your money, clearly.</h1></div><button className="button" onClick={() => { window.localStorage.removeItem("finance_token"); window.location.reload(); }}>Sign out</button></header><section className="welcome"><p className="eyebrow">MONTHLY OVERVIEW</p><h2>Good morning.</h2><p>Here is your current financial snapshot.</p></section><section className="cards">{cards.map(([label, value, note]) => <article className="card" key={label}><p>{label}</p><strong>{value}</strong><small>{note}</small></article>)}</section><section className="empty"><div className="icon">＋</div><h2>{summary?.income || summary?.expenses ? "Your spending overview" : "No transactions yet"}</h2><p>{summary?.income || summary?.expenses ? "Your imported transactions will appear here with category trends and insights." : "Upload a CSV statement and we’ll organize your income and expenses into a simple monthly view."}</p><button className="button">Import CSV</button></section></main>;
 }
