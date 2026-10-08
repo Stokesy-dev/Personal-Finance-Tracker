@@ -31,4 +31,29 @@ An AI-assisted personal finance analyzer for students and young professionals.
 
 ## Local setup
 
-The application is under active development. Setup instructions will be added with the first runnable slice.
+### Backend
+
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload
+```
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+The frontend runs on `http://localhost:3000` and the API on `http://localhost:8000`.
+Set `NEXT_PUBLIC_API_URL` when the API is hosted elsewhere. Docker Compose is also available:
+
+```bash
+docker compose up --build
+```
+
+See [PRIVACY.md](PRIVACY.md) before using real financial data.
